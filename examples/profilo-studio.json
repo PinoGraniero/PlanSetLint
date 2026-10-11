@@ -1,0 +1,6 @@
+{
+  "naming_template": "Tavola_{drawing}_{title}_Rev{revision}.pdf",
+  "tolerance_mm": 3.0,
+  "single_page": true,
+  "recursive": false
+}

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plansetlint"
-version = "0.1.0"
+version = "0.2.0"
 description = "Check architectural PDF drawing packages before delivery"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,6 +13,9 @@ dependencies = ["pypdf>=5,<7"]
 
 [project.scripts]
 plansetlint = "plansetlint.cli:main"
+
+[project.gui-scripts]
+plansetlint-gui = "plansetlint.gui:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

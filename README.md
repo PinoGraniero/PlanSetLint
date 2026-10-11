@@ -1,23 +1,34 @@
 # PlanSetLint
 
-A lightweight open-source command-line tool for checking architectural PDF drawing packages before submission or handover.
+Check architectural PDF drawing packages before submission or handover, with a local Italian desktop interface and a scriptable command-line tool.
 
-**Status: early prototype (0.1.0).** This is a new project with a small initial implementation. There are no claims of established adoption, production validation, or an existing community.
+**Status: early prototype, version 0.2.0.** The desktop interface and initial validation features are implemented. Real-world workflows and installation on individual Mac/Windows computers still need user testing.
 
-Small architecture practices often check drawing inventories, filenames, revisions and sheet sizes manually. PlanSetLint aims to make these repetitive checks accessible and scriptable without requiring a document-management platform.
+Small architecture practices often check drawing inventories, filenames, revisions and sheet sizes manually. PlanSetLint makes these repetitive checks accessible without requiring a document-management platform. PDF processing is local; the application makes no network requests while inspecting drawings.
 
-## What works today
+## Start with the desktop interface
 
-- Validate filenames such as `A-001_Ground-floor-plan_R01.pdf`.
-- Find duplicate drawing identifiers, including different revisions of the same drawing in one package.
-- Compare filenames with an optional CSV inventory to find missing or unexpected drawings and revision mismatches.
-- Open PDFs and flag unreadable, encrypted or non-single-page files.
-- Compare PDF page dimensions with an expected A0–A4 size from the CSV (portrait or landscape, 3 mm tolerance).
-- Print a text or JSON report; exit with code `0` for no issues and `1` for issues.
+See **[Guida italiana — installazione e prima prova](GUIDA-ITALIANA.md)** for a step-by-step walkthrough.
 
-## Installation
+1. Download and extract the source repository.
+2. Install Python 3.10+ with Tkinter if needed.
+3. Run `Avvia-PlanSetLint.bat` on Windows or `Avvia-PlanSetLint.command` on macOS. Alternatively, run `python3 launch.py` (`python launch.py` on Windows).
+4. Choose a PDF folder, optionally load a CSV inventory, and select **Avvia controllo**.
 
-Requires Python 3.10 or newer. From this repository directory:
+The launcher creates an isolated `.venv` and installs dependencies from PyPI on first use. Internet is required for initial setup; later checks work offline. There is no standalone Windows executable or macOS `.app` yet.
+
+The desktop interface includes a built-in synthetic demo, custom filename templates, saved JSON profiles, optional recursive checks, an issues table, a PDF inventory and HTML/CSV/JSON report export. HTML reports can be printed to PDF using a browser.
+
+## Available checks
+
+- Filename structure using a configurable template, such as `{drawing}_{title}_R{revision}.pdf`.
+- Duplicate drawing identifiers, including different revisions of one drawing in the package.
+- Missing or unexpected drawings and revision mismatches against an optional CSV inventory.
+- Unreadable, encrypted, empty or unexpectedly multi-page PDFs.
+- Expected A0–A4 or custom page dimensions, such as `420x900` mm, with configurable tolerance.
+- Optional subdirectory scanning.
+
+## CLI installation and use
 
 ```sh
 python -m venv .venv
@@ -26,54 +37,66 @@ source .venv/bin/activate
 # Windows PowerShell instead:
 # .venv\Scripts\Activate.ps1
 python -m pip install -e .
-```
 
-The package has not been published to PyPI. Install from the source checkout.
-
-## Usage
-
-```sh
 plansetlint ./drawings
-plansetlint ./drawings --manifest examples/drawings.csv
-plansetlint ./drawings --manifest examples/drawings.csv --json
+plansetlint ./drawings --manifest examples/drawings.csv --output report.html
+plansetlint ./drawings --config examples/profilo-studio.json --json
+plansetlint ./drawings --template 'Tavola_{drawing}_{title}_Rev{revision}.pdf' --recursive
+plansetlint-gui
 ```
 
-Example inventory:
+The package is not published to PyPI. Install from this source repository. Exit codes are `0` for no issues and `1` for validation or input/export errors. JSON output contains settings, inspected files, page sizes, issue codes and metadata.
+
+## Filename rules and inventories
+
+The three required filename fields are `{drawing}`, `{title}`, and `{revision}`, each appearing exactly once and separated by literal characters. Templates are literal text with placeholders, not arbitrary regular expressions. For example:
+
+```text
+A-001_Pianta_R01.pdf       → {drawing}_{title}_R{revision}.pdf
+Tavola_01_Pianta_RevB.pdf  → Tavola_{drawing}_{title}_Rev{revision}.pdf
+```
+
+Choose separators that do not occur inside drawing identifiers, and check the parsed identifiers in **PDF esaminati**. Ambiguous conventions cannot be inferred reliably. Drawing matching is case-insensitive, but `A-1` and `A-001` are different identifiers. Numeric revisions `1` and `01` are equivalent; letter revisions are accepted and compared case-insensitively. Titles are not checked against a title block.
+
+CSV files must be UTF-8 (optional BOM), comma- or semicolon-separated, with exact `drawing`, `revision`, `paper` headers:
 
 ```csv
 drawing,revision,paper
 A-001,01,A3
-A-002,02,A1
+A-002,B,420x900
+A-003,01,
 ```
 
-Use one PDF per drawing, named `<drawing>_<title>_R<revision>.pdf`. Drawing identifiers have an alphanumeric discipline prefix and numeric drawing number, separated by a hyphen. Identifier matching is case-insensitive, but `A-1` and `A-001` are different identifiers. Revisions are numeric: `R1` and `R01` match the same revision. Titles can contain spaces, underscores and accented characters.
+A blank `paper` skips the size comparison for that file. Custom sizes are in millimetres, with a decimal point when needed. Mixed paper sizes are allowed. A manifest must contain at least one drawing. Without a manifest, missing drawings, expected revisions and expected sheet sizes cannot be checked.
 
-The CSV is UTF-8, comma-separated, with required `drawing`, `revision`, `paper` columns. Leave `paper` empty to skip sheet-size checks for that drawing. Different expected sheet sizes are allowed within the same package.
+JSON profiles support `naming_template`, `tolerance_mm` (0–100), `single_page` and `recursive`. Defaults are 3 mm tolerance, one page per PDF and no recursive scan. Profiles store no document paths.
 
-Without a manifest, the tool cannot know which drawings are missing, which revision is expected, or which paper size is intended. Only immediate PDF files in the supplied directory are checked; subdirectories are not scanned.
+## Reports and limits
 
-## Limits
+HTML reports contain a full inventory and issue table. CSV exports contain the issue table with spreadsheet formula prefixes neutralized. JSON exports contain the full report. HTML output escapes filenames and messages and loads no remote scripts or assets. Report output cannot overwrite source PDFs or the supplied inventory/configuration.
 
-This prototype checks file metadata and naming, not architectural content. It does not read title blocks, perform OCR, validate dimensions or scale, inspect BIM models, or certify regulatory compliance. PDF dimensions use the MediaBox and UserUnit, not the visible cropped area. Input files are never modified. Reports can contain file names and local paths; review them before sharing.
+This prototype inspects filenames and PDF page metadata. It does not read title blocks, perform OCR, validate dimensions or drawing scale, inspect BIM models, or certify regulatory compliance. Page sizes use MediaBox and UserUnit, ignoring orientation and visible crop area. When multi-page files are allowed, every page is checked against the same expected size for that drawing.
 
-## Roadmap
+Input drawings are not modified. Reports may contain local paths and file names; review them before sharing. A clean result means only that the enabled checks passed.
 
-- Configurable naming rules for different studios.
-- Optional title-block text extraction and comparison.
-- Explicit support for multi-page drawing packages and custom sheet sizes.
-- More accessible report formats and a possible graphical interface.
-
-## Development and contributions
+## Tests and contributions
 
 ```sh
 python -m unittest discover -s tests -v
+# With a desktop display, or using xvfb-run on Linux:
+python tests/gui_smoke.py
 ```
 
-Issues and pull requests are welcome. Include a reproducible example, the expected behavior and the actual report. Use synthetic or anonymized files; do not upload confidential client drawings. Start with a small focused change and add tests for new validation behavior.
+GitHub Actions runs validation tests and a real Tk window smoke check on Python 3.10 and 3.13. User testing on macOS and Windows remains necessary.
 
-## Italiano
+Issues and pull requests are welcome. Include the OS, a reproducible example, expected behavior and actual report. Use synthetic or anonymized files; do not upload confidential client drawings.
 
-PlanSetLint è un piccolo strumento open source per controllare i fascicoli PDF di elaborati architettonici prima della consegna. La prima versione controlla denominazioni, duplicati e leggibilità dei PDF; con un elenco CSV verifica anche tavole mancanti, revisioni e formati carta. È un prototipo iniziale e non sostituisce la verifica tecnica degli elaborati.
+## Next steps
+
+- Test real studio naming conventions and refine usability.
+- Build distributable desktop packages after verifying the launch workflow.
+- Optional title-block text extraction, followed by OCR support where required.
+- Richer drawing inventories and additional report formats.
 
 ## License
 
